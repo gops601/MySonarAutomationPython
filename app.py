@@ -206,11 +206,13 @@ def extract_project_user(original_name, project_key):
 # -------- FETCH METRICS -------- #
 def fetch_metrics(project_key):
     try:
+        print(f"Fetching metrics for project: {project_key}")
         params = {
             "component": project_key,
             "metricKeys": METRIC_KEYS
         }
         r = requests.get(f"{SONAR_URL}/api/measures/component", params=params, auth=(TOKEN, ""))
+        r.raise_for_status()  # Raise exception for bad status codes
 
         data = r.json()
         metrics = {}
@@ -223,32 +225,47 @@ def fetch_metrics(project_key):
             except (TypeError, ValueError):
                 metrics[key] = value
 
+        print(f"Successfully fetched {len(metrics)} metrics")
         return metrics
-    except:
+    except requests.exceptions.RequestException as e:
+        print(f"Request error fetching metrics: {e}")
+        return {}
+    except Exception as e:
+        print(f"Unexpected error fetching metrics: {e}")
         return {}
 
 
 # -------- FETCH QUALITY -------- #
 def fetch_quality(project_key):
     try:
+        print(f"Fetching quality status for project: {project_key}")
         r = requests.get(
             f"{SONAR_URL}/api/qualitygates/project_status",
             params={"projectKey": project_key},
             auth=(TOKEN, "")
         )
-        return r.json().get("projectStatus", {}).get("status", "UNKNOWN")
-    except:
+        r.raise_for_status()
+        status = r.json().get("projectStatus", {}).get("status", "UNKNOWN")
+        print(f"Quality status: {status}")
+        return status
+    except requests.exceptions.RequestException as e:
+        print(f"Request error fetching quality: {e}")
+        return "UNKNOWN"
+    except Exception as e:
+        print(f"Unexpected error fetching quality: {e}")
         return "UNKNOWN"
 
 
 # -------- FETCH RATINGS -------- #
 def fetch_ratings(project_key):
     try:
+        print(f"Fetching ratings for project: {project_key}")
         params = {
             "component": project_key,
             "metricKeys": "reliability_rating,security_rating,sqale_rating"
         }
         r = requests.get(f"{SONAR_URL}/api/measures/component", params=params, auth=(TOKEN, ""))
+        r.raise_for_status()
 
         data = r.json()
         ratings = {}
@@ -263,8 +280,13 @@ def fetch_ratings(project_key):
             except (TypeError, ValueError):
                 ratings[f"{base}_score"] = None
 
+        print(f"Successfully fetched {len(ratings)} ratings")
         return ratings
-    except:
+    except requests.exceptions.RequestException as e:
+        print(f"Request error fetching ratings: {e}")
+        return {}
+    except Exception as e:
+        print(f"Unexpected error fetching ratings: {e}")
         return {}
 
 
@@ -273,7 +295,9 @@ def fetch_issues(project_key):
     all_issues = []
     page = 1
     page_size = 500
-    
+
+    print(f"Fetching issues for project: {project_key}")
+
     while True:
         try:
             r = requests.get(
@@ -281,18 +305,26 @@ def fetch_issues(project_key):
                 params={"componentKeys": project_key, "ps": page_size, "p": page},
                 auth=(TOKEN, "")
             )
+            r.raise_for_status()
             data = r.json()
             issues = data.get("issues", [])
             all_issues.extend(issues)
-            
+
             total = data.get("total", 0)
+            print(f"Fetched page {page}: {len(issues)} issues (total so far: {len(all_issues)}/{total})")
+
             if len(all_issues) >= total or len(issues) < page_size:
                 break
-            
+
             page += 1
-        except:
+        except requests.exceptions.RequestException as e:
+            print(f"Request error fetching issues page {page}: {e}")
             break
-    
+        except Exception as e:
+            print(f"Unexpected error fetching issues page {page}: {e}")
+            break
+
+    print(f"Successfully fetched {len(all_issues)} total issues")
     return all_issues
 
 
@@ -479,28 +511,41 @@ def dashboard():
 
 @app.route("/api/report/<project_key>", methods=["GET"])
 def api_report(project_key):
-    # Fetch latest data from SonarQube directly
-    metrics = fetch_metrics(project_key)
-    quality = fetch_quality(project_key)
-    ratings = fetch_ratings(project_key)
-    issues = fetch_issues(project_key)
-
-    # Save to database in the background (or rather, synchronously before returning)
     try:
-        save_data(project_key, metrics, quality, ratings, issues)
-    except Exception as e:
-        print(f"Failed to save data to DB: {e}")
+        # Fetch latest data from SonarQube directly
+        print(f"Fetching data for project: {project_key}")
+        metrics = fetch_metrics(project_key)
+        print(f"Metrics fetched: {len(metrics)} items")
 
-    return jsonify({
-        "metrics": metrics,
-        "quality": {
-            "status": quality,
-            "checked_at": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
-        },
-        "ratings": ratings,
-        "issues": issues,
-        "project_key": project_key
-    })
+        quality = fetch_quality(project_key)
+        print(f"Quality status: {quality}")
+
+        ratings = fetch_ratings(project_key)
+        print(f"Ratings fetched: {len(ratings)} items")
+
+        issues = fetch_issues(project_key)
+        print(f"Issues fetched: {len(issues)} items")
+
+        # Save to database in the background (or rather, synchronously before returning)
+        try:
+            save_data(project_key, metrics, quality, ratings, issues)
+            print("Data saved to database successfully")
+        except Exception as e:
+            print(f"Failed to save data to DB: {e}")
+
+        return jsonify({
+            "metrics": metrics,
+            "quality": {
+                "status": quality,
+                "checked_at": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            },
+            "ratings": ratings,
+            "issues": issues,
+            "project_key": project_key
+        })
+    except Exception as e:
+        print(f"Error in api_report: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/metrics_history/<project_key>", methods=["GET"])
 def api_metrics_history(project_key):
