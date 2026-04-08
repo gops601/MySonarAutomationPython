@@ -1,11 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 import requests
 import mysql.connector
+from datetime import datetime
 
 app = Flask(__name__)
 
 SONAR_URL = "http://187.127.142.34:9000"
-TOKEN = "squ_ff066785e24fbe24733df69242c14a50f7c4ae59"
+TOKEN = "squ_16777eb9d789d36e88ea27cf47a7759f9cb96662"
 
 DB = {
     "host": "localhost",
@@ -104,6 +105,28 @@ def ensure_db_schema():
     )""")
 
     cur.execute("""
+    CREATE TABLE IF NOT EXISTS metrics_history (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        project_key VARCHAR(255),
+        snapshot_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+        bugs INT DEFAULT 0,
+        vulnerabilities INT DEFAULT 0,
+        code_smells INT DEFAULT 0,
+        coverage FLOAT DEFAULT 0,
+        duplicated_lines FLOAT DEFAULT 0,
+        ncloc INT DEFAULT 0,
+        complexity INT DEFAULT 0,
+        duplicated_blocks INT DEFAULT 0,
+        new_bugs INT DEFAULT 0,
+        new_vulnerabilities INT DEFAULT 0,
+        new_code_smells INT DEFAULT 0,
+        reliability_remediation_effort VARCHAR(100),
+        security_remediation_effort VARCHAR(100),
+        sqale_debt_ratio FLOAT DEFAULT 0,
+        INDEX idx_project_key (project_key)
+    )""")
+
+    cur.execute("""
     CREATE TABLE IF NOT EXISTS issues (
         id INT AUTO_INCREMENT PRIMARY KEY,
         project_key VARCHAR(255),
@@ -159,6 +182,25 @@ def fetch_user_email(login):
         return login
     except:
         return login
+
+
+def extract_project_user(original_name, project_key):
+    if original_name and "-" in original_name:
+        parts = original_name.rsplit("-", 1)
+        if len(parts) == 2 and parts[1].strip():
+            return parts[1].strip(), parts[0].strip()
+
+    if original_name and "_" in original_name:
+        parts = original_name.split("_", 1)
+        if len(parts) == 2 and parts[0].strip():
+            return parts[0].strip(), parts[1].strip()
+
+    if project_key and "_" in project_key:
+        parts = project_key.split("_", 1)
+        if len(parts) == 2 and parts[0].strip():
+            return parts[0].strip(), original_name
+
+    return original_name, original_name
 
 
 # -------- FETCH METRICS -------- #
@@ -262,11 +304,11 @@ def fetch_issues_from_db(project_key, issue_type=None, severity=None):
     params = [project_key]
 
     if issue_type and issue_type.upper() != 'ALL':
-        query += " AND UPPER(`type`) = %s"
+        query += " AND TRIM(UPPER(`type`)) = %s"
         params.append(issue_type.upper())
 
     if severity:
-        query += " AND UPPER(severity) = %s"
+        query += " AND TRIM(UPPER(`severity`)) = %s"
         params.append(severity.upper())
 
     query += " ORDER BY severity DESC"
@@ -352,6 +394,34 @@ def save_data(project_key, metrics, quality, ratings, issues):
 
     cur.execute("DELETE FROM issues WHERE project_key = %s", (project_key,))
 
+    scan_date = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+
+    cur.execute("""
+    INSERT INTO metrics_history(
+        project_key, snapshot_date, bugs, vulnerabilities, code_smells, coverage,
+        duplicated_lines, ncloc, complexity, duplicated_blocks,
+        new_bugs, new_vulnerabilities, new_code_smells,
+        reliability_remediation_effort, security_remediation_effort, sqale_debt_ratio
+    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """, (
+        project_key,
+        scan_date,
+        metrics.get("bugs", 0),
+        metrics.get("vulnerabilities", 0),
+        metrics.get("code_smells", 0),
+        metrics.get("coverage", 0),
+        metrics.get("duplicated_lines_density", 0),
+        metrics.get("ncloc", 0),
+        metrics.get("complexity", 0),
+        metrics.get("duplicated_blocks", 0),
+        metrics.get("new_bugs", 0),
+        metrics.get("new_vulnerabilities", 0),
+        metrics.get("new_code_smells", 0),
+        metrics.get("reliability_remediation_effort"),
+        metrics.get("security_remediation_effort"),
+        metrics.get("sqale_debt_ratio", 0)
+    ))
+
     for issue in issues:
         issue_type_value = str(issue.get("type", "UNKNOWN")).upper()
         cur.execute("""
@@ -390,25 +460,19 @@ def dashboard():
     grouped_projects = {}
     for p in projects_raw:
         original_name = p.get('name', 'Unknown')
-        parts = original_name.split('-')
-        
-        if len(parts) >= 2:
-            userid = parts[-1].strip()
-            proj_name = "-".join(parts[:-1]).strip()
-            user_email = fetch_user_email(userid)
-        else:
-            userid = "Other"
-            user_email = "Other"
-            proj_name = original_name.strip()
+        project_key = p.get('key', '')
+        userid, proj_name = extract_project_user(original_name, project_key)
+        user_email = fetch_user_email(userid)
+
+        if userid not in grouped_projects:
+            grouped_projects[userid] = []
             
-        if user_email not in grouped_projects:
-            grouped_projects[user_email] = []
-            
-        grouped_projects[user_email].append({
-            'key': p.get('key', ''),
+        grouped_projects[userid].append({
+            'key': project_key,
             'name': proj_name,
             'original_name': original_name,
-            'original_key': p.get('key', '')
+            'original_key': project_key,
+            'email': user_email
         })
 
     return render_template("dashboard.html", grouped_projects=grouped_projects)
@@ -429,11 +493,31 @@ def api_report(project_key):
 
     return jsonify({
         "metrics": metrics,
-        "quality": {"status": quality},
+        "quality": {
+            "status": quality,
+            "checked_at": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+        },
         "ratings": ratings,
         "issues": issues,
         "project_key": project_key
     })
+
+@app.route("/api/metrics_history/<project_key>", methods=["GET"])
+def api_metrics_history(project_key):
+    try:
+        conn = db_conn()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT snapshot_date, bugs, vulnerabilities, code_smells, coverage, ncloc, complexity "
+            "FROM metrics_history WHERE project_key = %s ORDER BY snapshot_date ASC LIMIT 30",
+            (project_key,)
+        )
+        history = cur.fetchall()
+        cur.close()
+        conn.close()
+        return jsonify({"history": history})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/fetch/<project_key>", methods=["GET"])
 def fetch_project(project_key):
@@ -456,6 +540,16 @@ def api_issues(project_key):
     severity = request.args.get('severity')
     try:
         issues = fetch_issues_from_db(project_key, issue_type, severity)
+        if not issues:
+            # Fallback to live Sonar data if DB does not yet contain filtered issues
+            all_issues = fetch_issues(project_key)
+            if issue_type and issue_type.upper() != 'ALL':
+                issue_type_value = issue_type.upper()
+                all_issues = [issue for issue in all_issues if str(issue.get('type', '')).upper() == issue_type_value]
+            if severity:
+                severity_value = severity.upper()
+                all_issues = [issue for issue in all_issues if str(issue.get('severity', '')).upper() == severity_value]
+            issues = all_issues
         return jsonify({"issues": issues})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
