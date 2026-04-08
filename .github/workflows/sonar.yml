@@ -74,5 +74,5 @@ jobs:
           args: >
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.sources=.
-            -Dsonar.login=qu_ff066785e24fbe24733df69242c14a50f7c4ae59
+            -Dsonar.login=squ_ff066785e24fbe24733df69242c14a50f7c4ae59
             -Dsonar.python.coverage.reportPaths=coverage.xml
