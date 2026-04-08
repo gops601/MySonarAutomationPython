@@ -69,10 +69,10 @@ jobs:
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v6
         env:
-          SONAR_HOST_URL: http://44.201.203.105:9000
+          SONAR_HOST_URL: http://187.127.142.34:9000/
         with:
           args: >
             -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
             -Dsonar.sources=.
-            -Dsonar.login=squ_4f7ac18302a201ff8063adbbe59d1c2f8bdb4307
+            -Dsonar.login=squ_ff066785e24fbe24733df69242c14a50f7c4ae59
             -Dsonar.python.coverage.reportPaths=coverage.xml
