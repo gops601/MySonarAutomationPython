@@ -77,6 +77,5 @@ jobs:
 
             -Dsonar.login=squ_16777eb9d789d36e88ea27cf47a7759f9cb96662
 
-            -Dsonar.login=squ_ff066785e24fbe24733df69242c14a50f7c4ae59
 
             -Dsonar.python.coverage.reportPaths=coverage.xml
