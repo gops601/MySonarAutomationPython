@@ -1,76 +1,1033 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-<title>Sonar Dashboard</title>
-<style>
-body { font-family: Arial; background:#f5f7fb; padding:20px; }
-h1 { text-align:center; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICTAK Sonar Insights</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-.container { display:flex; justify-content:center; flex-wrap:wrap; }
+        :root {
+            --bg-base: #0f172a;
+            --bg-surface: #1e293b;
+            --bg-surface-hover: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-primary: #3b82f6;
+            --accent-success: #10b981;
+            --accent-danger: #ef4444;
+            --accent-warning: #f59e0b;
+            --border-color: #334155;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
 
-.card {
-    background:white;
-    padding:20px;
-    margin:10px;
-    border-radius:10px;
-    box-shadow:0 2px 6px rgba(0,0,0,0.1);
-}
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-.pass { color:green; font-weight:bold; }
-.fail { color:red; font-weight:bold; }
-</style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 340px;
+            background-color: var(--bg-surface);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(135deg, var(--bg-surface) 0%, #0f172a 100%);
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: -webkit-linear-gradient(45deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 14px 10px 36px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-primary);
+        }
+
+        .search-box svg {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            width: 16px;
+            height: 16px;
+        }
+
+        .project-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        /* Custom scrollbar */
+        .project-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .project-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .project-list::-webkit-scrollbar-thumb {
+            background-color: var(--border-color);
+            border-radius: 10px;
+        }
+
+        /* Accordion Styles */
+        .user-group {
+            margin-bottom: 4px;
+        }
+
+        .user-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: var(--radius-md);
+            background-color: transparent;
+            transition: background-color 0.2s;
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+
+        .user-header:hover {
+            background-color: var(--bg-surface-hover);
+        }
+
+        .user-header svg {
+            transition: transform 0.2s ease;
+            width: 16px;
+            height: 16px;
+            color: var(--text-secondary);
+        }
+
+        .user-group.expanded .user-header svg {
+            transform: rotate(90deg);
+        }
+
+        .badge {
+            margin-left: auto;
+            background: var(--bg-base);
+            color: var(--text-secondary);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .user-projects {
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            padding-left: 12px;
+            margin-top: 4px;
+            border-left: 2px solid var(--border-color);
+            margin-left: 19px;
+        }
+
+        .user-group.expanded .user-projects {
+            display: flex;
+        }
+
+        .project-item {
+            padding: 10px 14px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+
+        .project-item:hover {
+            background-color: var(--bg-surface-hover);
+        }
+
+        .project-item.active {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-color: rgba(59, 130, 246, 0.3);
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .project-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+            margin-bottom: 2px;
+            color: var(--text-primary);
+        }
+
+        .project-key {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            background: radial-gradient(circle at top right, #1e293b 0%, #0f172a 100%);
+        }
+
+        .topbar {
+            padding: 24px 40px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .topbar-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .dashboard-container {
+            padding: 40px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* States */
+        .empty-state,
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: var(--text-secondary);
+            animation: fadeIn 0.5s ease;
+        }
+
+        .empty-state h2 {
+            margin-top: 16px;
+            font-weight: 500;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            opacity: 0.5;
+        }
+
+        /* Spinner */
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--accent-primary);
+            animation: spin 1s ease-in-out infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            display: none;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .card {
+            background-color: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .view-all-btn {
+            margin-left: auto;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .view-all-btn:hover {
+            background: rgba(59, 130, 246, 0.8);
+        }
+
+        .qg-card {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
+        }
+
+        .qg-status {
+            font-size: 2.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-ok {
+            color: var(--accent-success);
+        }
+
+        .status-error {
+            color: var(--accent-danger);
+        }
+
+        .status-unknown {
+            color: var(--text-secondary);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .rating-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1.125rem;
+            margin-left: 12px;
+        }
+
+        .rating-A {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: var(--accent-success);
+        }
+
+        .rating-B {
+            background-color: rgba(139, 195, 74, 0.2);
+            color: #8bc34a;
+        }
+
+        .rating-C {
+            background-color: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .rating-D {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+        }
+
+        .rating-E {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: var(--accent-danger);
+        }
+
+        .metrics-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 16px;
+        }
+
+        .metrics-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 0;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 800px;
+            max-height: 80%;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .close-btn:hover {
+            background-color: var(--bg-surface-hover);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .issue-item {
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
+            background-color: rgba(15, 23, 42, 0.3);
+        }
+
+        .issue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .issue-severity {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .severity-BLOCKER { background-color: rgba(239, 68, 68, 0.2); color: var(--accent-danger); }
+        .severity-CRITICAL { background-color: rgba(239, 68, 68, 0.2); color: var(--accent-danger); }
+        .severity-MAJOR { background-color: rgba(245, 158, 11, 0.2); color: var(--accent-warning); }
+        .severity-MINOR { background-color: rgba(59, 130, 246, 0.2); color: var(--accent-primary); }
+        .severity-INFO { background-color: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
+
+        .issue-message {
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .issue-details {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .issue-preview-list {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .issue-preview-item {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            background-color: rgba(15, 23, 42, 0.45);
+        }
+
+        .issue-preview-item .issue-header {
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .issue-preview-item .issue-details {
+            margin-top: 8px;
+        }
+
+        .metrics-row span.metric-label {
+            display: block;
+        }
+
+        .no-issues {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+    </style>
 </head>
 
 <body>
 
-<h1>📊 Sonar Dashboard</h1>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h1>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                    </path>
+                    <polyline points="3.29 7 12 12 20.71 7"></polyline>
+                    <line x1="12" y1="22" x2="12" y2="12"></line>
+                </svg>
+                Sonar Insights
+            </h1>
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="searchInput" placeholder="Search user or project..." onkeyup="filterSidebar()" />
+            </div>
+        </div>
 
-<form method="POST" style="text-align:center;">
-<select name="project">
-{% for p in projects %}
-<option value="{{p.key}}">{{p.name}}</option>
-{% endfor %}
-</select>
+        <div class="project-list" id="projectList">
+            {% for userid, projs in grouped_projects.items() %}
+            <div class="user-group" data-userid="{{ userid|lower }}">
+                <div class="user-header" onclick="toggleUserGroup(this)">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                    <span class="userid-text">{{ userid }}</span>
+                    <span class="badge">{{ projs|length }}</span>
+                </div>
+                <div class="user-projects">
+                    {% for p in projs %}
+                    <div class="project-item" data-key="{{ p.key }}" data-name="{{ p.original_name }}"
+                        data-search="{{ p.name|lower }}" onclick="selectProject(this)">
+                        <div class="project-name">{{ p.name }}</div>
+                        <div class="project-key">{{ p.key }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            {% if not grouped_projects %}
+            <div style="padding: 20px; text-align: center; color: var(--text-secondary);">
+                No projects found.
+            </div>
+            {% endif %}
+        </div>
+    </div>
 
-<button type="submit">Load</button>
-</form>
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="topbar">
+            <div class="topbar-title" id="topbarTitle">Select a Project</div>
+        </div>
 
-{% if selected_project %}
-<div style="text-align:center; margin-top:10px;">
-<a href="/fetch/{{selected_project}}">Fetch Latest Data</a>
-</div>
-{% endif %}
+        <div class="dashboard-container">
 
-<div class="container">
+            <div class="empty-state" id="emptyState">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <path d="M2 15h10"></path>
+                    <path d="M9 18l3-3-3-3"></path>
+                </svg>
+                <h2>Select a project from the sidebar to view insights</h2>
+            </div>
 
-{% if metrics %}
-<div class="card">
-<h3>Bugs: {{metrics.bugs}}</h3>
-<h3>Vulnerabilities: {{metrics.vulnerabilities}}</h3>
-<h3>Code Smells: {{metrics.code_smells}}</h3>
-<h3>Coverage: {{metrics.coverage}}%</h3>
-</div>
-{% endif %}
+            <div class="loading-state" id="loadingState" style="display: none;">
+                <div class="spinner"></div>
+                <h2>Fetching latest metrics...</h2>
+            </div>
 
-{% if quality %}
-<div class="card">
-<h3>Quality Gate:
-<span class="{{'pass' if quality.status=='OK' else 'fail'}}">
-{{quality.status}}
-</span>
-</h3>
-</div>
-{% endif %}
+            <div class="dashboard-grid" id="dashboardGrid">
 
-{% if ratings %}
-<div class="card">
-<h3>Reliability: {{ratings.reliability}}</h3>
-<h3>Security: {{ratings.security}}</h3>
-<h3>Maintainability: {{ratings.maintainability}}</h3>
-</div>
-{% endif %}
+                <div class="card qg-card">
+                    <div>
+                        <div class="card-header" style="margin-bottom: 8px;">Quality Gate Status</div>
+                        <div class="qg-status" id="valQualityGate">--</div>
+                    </div>
+                    <div>
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5" style="opacity: 0.2;">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                    </div>
+                </div>
 
-</div>
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon"><span style="color:var(--accent-danger)">🐛</span></div>
+                        Issues Overview
+                        <button class="view-all-btn" onclick="showIssues('all')">View All Issues</button>
+                    </div>
+                    <div class="metrics-row">
+                        <div>
+                            <div class="metric-value" id="valTotalIssues">0</div>
+                            <div class="metric-label">Total Issues</div>
+                        </div>
+                        <div class="metric-label" id="valIssueBreakdown" style="font-size: 0.85rem; color: var(--text-secondary); align-self: center; white-space: nowrap;">
+                            B 0 / V 0 / C 0
+                        </div>
+                    </div>
+                    <div class="metrics-row">
+                        <div>
+                            <div class="metric-value" id="valBugs" style="cursor: pointer;" onclick="showIssues('BUG')">0</div>
+                            <div class="metric-label">Bugs</div>
+                        </div>
+                        <div class="rating-badge" id="valReliability">--</div>
+                    </div>
+                    <div class="metrics-row">
+                        <div>
+                            <div class="metric-value" id="valVulnerabilities" style="cursor: pointer;" onclick="showIssues('VULNERABILITY')">0</div>
+                            <div class="metric-label">Vulnerabilities</div>
+                        </div>
+                        <div class="rating-badge" id="valSecurity">--</div>
+                    </div>
+                    <div class="metrics-row">
+                        <div>
+                            <div class="metric-value" id="valCodeSmells" style="cursor: pointer;" onclick="showIssues('CODE_SMELL')">0</div>
+                            <div class="metric-label">Code Smells</div>
+                        </div>
+                        <div class="rating-badge" id="valMaintainability">--</div>
+                    </div>
+                    <div class="metrics-row" style="gap: 16px; flex-wrap: wrap;">
+                        <div style="cursor:pointer; min-width: 90px;" onclick="showIssues('all', 'BLOCKER')">
+                            <div class="metric-value" id="valBlocker">0</div>
+                            <div class="metric-label">Blocker</div>
+                        </div>
+                        <div style="cursor:pointer; min-width: 90px;" onclick="showIssues('all', 'CRITICAL')">
+                            <div class="metric-value" id="valCritical">0</div>
+                            <div class="metric-label">Critical</div>
+                        </div>
+                        <div style="cursor:pointer; min-width: 90px;" onclick="showIssues('all', 'MAJOR')">
+                            <div class="metric-value" id="valMajor">0</div>
+                            <div class="metric-label">Major</div>
+                        </div>
+                    </div>
+                </div>
 
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon"><span style="color:var(--accent-primary)">📊</span></div>
+                        Code Analysis
+                    </div>
+                    <div style="margin-top: 32px">
+                        <div class="metric-value"><span id="valCoverage">0</span><span
+                                style="font-size: 1rem; color: var(--text-secondary)">%</span></div>
+                        <div class="metric-label" style="margin-bottom: 24px">Code Coverage</div>
+
+                        <div class="metric-value"><span id="valDuplicated">0</span><span
+                                style="font-size: 1rem; color: var(--text-secondary)">%</span></div>
+                        <div class="metric-label" style="margin-bottom: 24px">Duplicated Lines Density</div>
+
+                        <div class="metrics-row" style="margin-top: 16px; gap: 24px; display: flex; flex-wrap: wrap;">
+                            <div style="min-width: 130px;">
+                                <div class="metric-value" id="valNloc">0</div>
+                                <div class="metric-label">Lines of Code</div>
+                            </div>
+                            <div style="min-width: 130px;">
+                                <div class="metric-value" id="valComplexity">0</div>
+                                <div class="metric-label">Cognitive Complexity</div>
+                            </div>
+                            <div style="min-width: 130px;">
+                                <div class="metric-value" id="valDuplicatedBlocks">0</div>
+                                <div class="metric-label">Duplicated Blocks</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" id="recentIssuesCard" style="display: none;">
+                    <div class="card-header">
+                        <div class="card-icon"><span style="color:var(--accent-warning)">📝</span></div>
+                        Recent Issues
+                    </div>
+                    <div class="issue-preview-list" id="issuePreview"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Issues Modal -->
+    <div id="issuesModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Issues for <span id="modalProjectName"></span></h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="issuesList">
+                    <!-- Issues will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let latestIssues = [];
+
+        function toggleUserGroup(element) {
+            const group = element.parentElement;
+            group.classList.toggle('expanded');
+        }
+
+        function filterSidebar() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const userGroups = document.querySelectorAll('.user-group');
+
+            userGroups.forEach(group => {
+                const userId = group.getAttribute('data-userid');
+                const projects = group.querySelectorAll('.project-item');
+                let hasVisibleProject = false;
+
+                // Check if user exactly matches query (implies show all children)
+                const userMatches = userId.includes(query);
+
+                projects.forEach(proj => {
+                    const projMatch = proj.getAttribute('data-search').includes(query);
+                    if (userMatches || projMatch) {
+                        proj.style.display = 'block';
+                        hasVisibleProject = true;
+                    } else {
+                        proj.style.display = 'none';
+                    }
+                });
+
+                if (hasVisibleProject) {
+                    group.style.display = 'block';
+                    // Auto-expand if searching
+                    if (query.length > 0) {
+                        group.classList.add('expanded');
+                    } else {
+                        // Collapse all on empty search
+                        group.classList.remove('expanded');
+                    }
+                } else {
+                    group.style.display = 'none';
+                }
+            });
+        }
+
+        function selectProject(element) {
+            // UI Selection
+            document.querySelectorAll('.project-item').forEach(el => el.classList.remove('active'));
+            element.classList.add('active');
+
+            const projectKey = element.getAttribute('data-key');
+            const projectName = element.getAttribute('data-name');
+
+            // Switch States
+            document.getElementById('topbarTitle').innerText = projectName;
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('dashboardGrid').style.display = 'none';
+            document.getElementById('loadingState').style.display = 'flex';
+
+            // Fetch Data
+            fetch(`/api/report/${encodeURIComponent(projectKey)}`)
+                .then(response => response.json())
+                .then(data => {
+                    populateDashboard(data);
+                    document.getElementById('loadingState').style.display = 'none';
+                    document.getElementById('dashboardGrid').style.display = 'grid';
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    alert("Failed to fetch data for " + projectName);
+                    document.getElementById('loadingState').style.display = 'none';
+                    document.getElementById('emptyState').style.display = 'flex';
+                });
+        }
+
+        function populateDashboard(data) {
+            const qgStatus = data.quality.status || 'UNKNOWN';
+            const qgEl = document.getElementById('valQualityGate');
+            qgEl.innerText = qgStatus;
+            qgEl.className = 'qg-status';
+            if (qgStatus === 'OK') qgEl.classList.add('status-ok');
+            else if (qgStatus === 'ERROR') qgEl.classList.add('status-error');
+            else qgEl.classList.add('status-unknown');
+
+            const m = data.metrics || {};
+            document.getElementById('valBugs').innerText = m.bugs || 0;
+            document.getElementById('valVulnerabilities').innerText = m.vulnerabilities || 0;
+            document.getElementById('valCodeSmells').innerText = m.code_smells || 0;
+            document.getElementById('valCoverage').innerText = m.coverage || 0;
+            document.getElementById('valDuplicated').innerText = m.duplicated_lines_density || 0;
+            document.getElementById('valNloc').innerText = m.ncloc || 0;
+            document.getElementById('valComplexity').innerText = m.complexity || 0;
+            document.getElementById('valDuplicatedBlocks').innerText = m.duplicated_blocks || 0;
+
+            setRating('valReliability', data.ratings.reliability || data.ratings.reliability_rating);
+            setRating('valSecurity', data.ratings.security || data.ratings.security_rating);
+            setRating('valMaintainability', data.ratings.maintainability || data.ratings.sqale_rating);
+
+            latestIssues = data.issues || [];
+            updateIssueCounts(latestIssues);
+            renderIssuePreview(latestIssues);
+        }
+
+        function updateIssueCounts(issues) {
+            const bugCount = issues.filter(issue => issue.type === 'BUG').length;
+            const vulnCount = issues.filter(issue => issue.type === 'VULNERABILITY').length;
+            const codeSmellCount = issues.filter(issue => issue.type === 'CODE_SMELL').length;
+            const blockerCount = issues.filter(issue => issue.severity === 'BLOCKER').length;
+            const criticalCount = issues.filter(issue => issue.severity === 'CRITICAL').length;
+            const majorCount = issues.filter(issue => issue.severity === 'MAJOR').length;
+
+            document.getElementById('valTotalIssues').innerText = issues.length;
+            document.getElementById('valIssueBreakdown').innerText = `B ${bugCount} / V ${vulnCount} / C ${codeSmellCount}`;
+            document.getElementById('valBlocker').innerText = blockerCount;
+            document.getElementById('valCritical').innerText = criticalCount;
+            document.getElementById('valMajor').innerText = majorCount;
+        }
+
+        function renderIssuePreview(issues) {
+            const preview = document.getElementById('issuePreview');
+            const card = document.getElementById('recentIssuesCard');
+            if (!issues || issues.length === 0) {
+                card.style.display = 'none';
+                preview.innerHTML = '';
+                return;
+            }
+
+            card.style.display = 'block';
+            const sample = issues.slice(0, 5);
+            preview.innerHTML = sample.map(issue => `
+                <div class="issue-preview-item">
+                    <div class="issue-header">
+                        <span class="issue-severity severity-${issue.severity}">${issue.severity}</span>
+                        <span class="issue-key">${issue.issue_key}</span>
+                        <span class="issue-details">${issue.category || issue.type || 'UNKNOWN'}</span>
+                    </div>
+                    <div class="issue-message">${issue.message}</div>
+                    <div class="issue-details">${issue.component || issue.file || 'Unknown location'}${issue.line ? ` - Line ${issue.line}` : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        function setRating(elementId, ratingValue) {
+            const el = document.getElementById(elementId);
+            el.innerText = ratingValue || 'N/A';
+            el.className = `rating-badge rating-${ratingValue}`;
+        }
+
+        function showIssues(issueType, severity) {
+            const projectItem = document.querySelector('.project-item.active');
+            if (!projectItem) {
+                alert('Please select a project first.');
+                return;
+            }
+
+            const projectKey = projectItem.getAttribute('data-key');
+            const projectName = projectItem.getAttribute('data-name');
+
+            const type = (issueType || 'all').toUpperCase();
+            const severityValue = severity ? severity.toUpperCase() : null;
+            let title = projectName;
+
+            if (severityValue === 'BLOCKER') title += ' - Blocker Issues';
+            else if (severityValue === 'CRITICAL') title += ' - Critical Issues';
+            else if (severityValue === 'MAJOR') title += ' - Major Issues';
+            else if (type === 'BUG') title += ' - Bugs';
+            else if (type === 'VULNERABILITY') title += ' - Vulnerabilities';
+            else if (type === 'CODE_SMELL') title += ' - Code Smells';
+            else title += ' - All Issues';
+
+            document.getElementById('modalProjectName').innerText = title;
+            document.getElementById('issuesModal').style.display = 'flex';
+            document.getElementById('issuesList').innerHTML = '<div class="spinner" style="margin: 40px auto;"></div><p style="text-align: center; color: var(--text-secondary);">Loading issues...</p>';
+
+            let url = `/api/issues/${encodeURIComponent(projectKey)}`;
+            const params = [];
+            if (type !== 'ALL') {
+                params.push(`type=${type}`);
+            }
+            if (severityValue) {
+                params.push(`severity=${severityValue}`);
+            }
+            if (params.length) {
+                url += `?${params.join('&')}`;
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    populateIssues(data.issues);
+                })
+                .catch(error => {
+                    console.error('Error fetching issues:', error);
+                    document.getElementById('issuesList').innerHTML = '<div class="no-issues">Failed to load issues.</div>';
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('issuesModal').style.display = 'none';
+        }
+
+        function populateIssues(issues) {
+            const container = document.getElementById('issuesList');
+            if (!issues || issues.length === 0) {
+                container.innerHTML = '<div class="no-issues">No issues found for this project.</div>';
+                return;
+            }
+
+            let html = '';
+            issues.forEach(issue => {
+                const issueType = issue.type ? issue.type.replace('_', ' ') : 'UNKNOWN';
+                const issueCategory = issue.category || 'UNKNOWN';
+                html += `
+                    <div class="issue-item">
+                        <div class="issue-header">
+                            <span class="issue-severity severity-${issue.severity}">${issue.severity}</span>
+                            <span class="issue-key">${issue.issue_key}</span>
+                            <span class="issue-details" style="margin-left:auto; font-weight:600; color:var(--text-primary);">${issueType}</span>
+                        </div>
+                        <div class="issue-message">${issue.message}</div>
+                        <div class="issue-details">
+                            ${issue.component || issue.file || 'Unknown location'}${issue.line ? ` - Line ${issue.line}` : ''}
+                        </div>
+                        <div class="issue-details">
+                            Category: ${issueCategory}${issue.status ? ` • Status: ${issue.status}` : ''}${issue.rule ? ` • Rule: ${issue.rule}` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('issuesModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+    </script>
 </body>
+
 </html>
