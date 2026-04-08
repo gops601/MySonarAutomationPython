@@ -593,6 +593,140 @@
             padding: 40px;
             color: var(--text-secondary);
         }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 300px;
+            }
+
+            .dashboard-container {
+                padding: 24px;
+            }
+
+            .topbar {
+                padding: 16px 24px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 16px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                height: auto;
+                overflow: auto;
+            }
+
+            .sidebar {
+                width: 100%;
+                height: auto;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                max-height: 300px;
+            }
+
+            .main-content {
+                height: auto;
+                overflow: visible;
+            }
+
+            .topbar {
+                padding: 16px 20px;
+            }
+
+            .topbar-title {
+                font-size: 1.25rem;
+            }
+
+            .dashboard-container {
+                padding: 20px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+
+            .qg-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 16px;
+            }
+
+            .qg-status {
+                font-size: 2rem;
+            }
+
+            .metric-value {
+                font-size: 2rem;
+            }
+
+            .metrics-row {
+                gap: 16px !important;
+            }
+
+            .metrics-row > div {
+                min-width: 100px !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .sidebar-header {
+                padding: 16px;
+            }
+
+            .dashboard-container {
+                padding: 16px;
+            }
+
+            .card {
+                padding: 16px;
+            }
+
+            .card-header {
+                font-size: 0.9rem;
+            }
+
+            .metric-value {
+                font-size: 1.75rem;
+            }
+
+            .qg-status {
+                font-size: 1.75rem;
+                gap: 12px;
+            }
+
+            .view-all-btn {
+                padding: 6px 12px;
+                font-size: 0.7rem;
+                min-width: 100px;
+            }
+
+            .modal-content {
+                width: 95%;
+                max-height: 90%;
+            }
+
+            .modal-header {
+                padding: 16px;
+            }
+
+            .modal-header h2 {
+                font-size: 1.1rem;
+            }
+
+            .modal-body {
+                padding: 16px;
+            }
+        }
     </style>
 </head>
 
@@ -654,6 +788,9 @@
     <div class="main-content">
         <div class="topbar">
             <div class="topbar-title" id="topbarTitle">Select a Project</div>
+            <button id="graphicalAnalysisBtn" class="view-all-btn" style="display: none;" onclick="openGraphicalAnalysis()">
+                📊 Graphical Analysis
+            </button>
         </div>
 
         <div class="dashboard-container">
@@ -771,24 +908,6 @@
                                 <div class="metric-label">Duplicated Blocks</div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon"><span style="color:var(--accent-primary)">📈</span></div>
-                        Metric Comparison Over Time
-                    </div>
-                    <div style="margin-top: 16px; display: grid; gap: 12px;">
-                        <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-                            <label style="font-size:0.85rem; color:var(--text-secondary);">From</label>
-                            <input type="date" id="historyStartDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary);">
-                            <label style="font-size:0.85rem; color:var(--text-secondary);">To</label>
-                            <input type="date" id="historyEndDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary);">
-                            <button class="view-all-btn" style="margin-left:auto; min-width: 120px;" onclick="applyMetricDateFilter()">Apply Filter</button>
-                        </div>
-                        <canvas id="metricHistoryChart" height="220"></canvas>
-                        <div class="metric-label" id="metricHistoryMessage" style="margin-top: 12px; color: var(--text-secondary);">Metric history shows the latest 30 scan snapshots.</div>
                     </div>
                 </div>
 
@@ -926,6 +1045,10 @@
             latestIssues = data.issues || [];
             updateIssueCounts(latestIssues);
             renderIssuePreview(latestIssues);
+
+            // Show graphical analysis button
+            document.getElementById('graphicalAnalysisBtn').style.display = 'block';
+            document.getElementById('graphModalProjectName').innerText = data.project_key || 'Unknown Project';
         }
 
         function parseSnapshotDate(value) {
@@ -947,6 +1070,20 @@
                 .catch(error => {
                     console.error('Error loading metric history:', error);
                     document.getElementById('metricHistoryMessage').innerText = 'Unable to load metric history.';
+                });
+        }
+
+        function fetchMetricHistory(projectKey) {
+            fetch(`/api/metrics_history/${encodeURIComponent(projectKey)}`)
+                .then(response => response.json())
+                .then(data => {
+                    const historyData = data.history || [];
+                    renderGraphMetricHistoryChart(historyData);
+                    document.getElementById('graphMetricHistoryMessage').innerText = 'Metric history shows the latest 30 scan snapshots.';
+                })
+                .catch(error => {
+                    console.error('Error loading metric history for graph:', error);
+                    document.getElementById('graphMetricHistoryMessage').innerText = 'Unable to load metric history.';
                 });
         }
 
@@ -976,6 +1113,43 @@
                 document.getElementById('metricHistoryMessage').innerText = `Showing ${filtered.length} snapshots between ${startDateInput || 'start'} and ${endDateInput || 'end'}.`;
             }
             renderMetricHistoryChart(filtered);
+        }
+
+        function applyGraphMetricDateFilter() {
+            const startDateInput = document.getElementById('graphHistoryStartDate').value;
+            const endDateInput = document.getElementById('graphHistoryEndDate').value;
+
+            fetch(`/api/metrics_history/${encodeURIComponent(currentProjectKey)}`)
+                .then(response => response.json())
+                .then(data => {
+                    let filtered = data.history || [];
+
+                    if (startDateInput) {
+                        const startDate = new Date(startDateInput + 'T00:00:00');
+                        filtered = filtered.filter(item => {
+                            const date = parseSnapshotDate(item.snapshot_date);
+                            return date && date >= startDate;
+                        });
+                    }
+                    if (endDateInput) {
+                        const endDate = new Date(endDateInput + 'T23:59:59');
+                        filtered = filtered.filter(item => {
+                            const date = parseSnapshotDate(item.snapshot_date);
+                            return date && date <= endDate;
+                        });
+                    }
+
+                    if (filtered.length === 0) {
+                        document.getElementById('graphMetricHistoryMessage').innerText = 'No history available for the selected date range.';
+                    } else {
+                        document.getElementById('graphMetricHistoryMessage').innerText = `Showing ${filtered.length} snapshots between ${startDateInput || 'start'} and ${endDateInput || 'end'}.`;
+                    }
+                    renderGraphMetricHistoryChart(filtered);
+                })
+                .catch(error => {
+                    console.error('Error applying graph date filter:', error);
+                    document.getElementById('graphMetricHistoryMessage').innerText = 'Error filtering data.';
+                });
         }
 
         function renderMetricHistoryChart(history) {
@@ -1019,6 +1193,105 @@
                             data: codeSmellData,
                             borderColor: '#f59e0b',
                             backgroundColor: 'rgba(245,158,11,0.15)',
+                            fill: true,
+                            tension: 0.35
+                        },
+                        {
+                            label: 'Coverage',
+                            data: coverageData,
+                            borderColor: '#0ea5e9',
+                            backgroundColor: 'rgba(14,165,233,0.15)',
+                            fill: true,
+                            tension: 0.35,
+                            yAxisID: 'coverageAxis'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Count / Value' }
+                        },
+                        coverageAxis: {
+                            position: 'right',
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Coverage %' }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        function renderGraphMetricHistoryChart(history) {
+            const ctx = document.getElementById('graphMetricHistoryChart').getContext('2d');
+            if (metricHistoryChart) {
+                metricHistoryChart.destroy();
+            }
+
+            if (!history || history.length === 0) {
+                metricHistoryChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: [], datasets: [] },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        }
+                    }
+                });
+                return;
+            }
+
+            const sortedHistory = history.sort((a, b) => {
+                const dateA = parseSnapshotDate(a.snapshot_date);
+                const dateB = parseSnapshotDate(b.snapshot_date);
+                return dateA - dateB;
+            });
+
+            const labels = sortedHistory.map(item => {
+                const date = parseSnapshotDate(item.snapshot_date);
+                return date ? date.toLocaleDateString() : 'Unknown';
+            });
+
+            const bugsData = sortedHistory.map(item => parseFloat(item.bugs) || 0);
+            const vulnerabilitiesData = sortedHistory.map(item => parseFloat(item.vulnerabilities) || 0);
+            const codeSmellsData = sortedHistory.map(item => parseFloat(item.code_smells) || 0);
+            const coverageData = sortedHistory.map(item => parseFloat(item.coverage) || 0);
+
+            metricHistoryChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Bugs',
+                            data: bugsData,
+                            borderColor: '#e11d48',
+                            backgroundColor: 'rgba(225,29,72,0.15)',
+                            fill: true,
+                            tension: 0.35
+                        },
+                        {
+                            label: 'Vulnerabilities',
+                            data: vulnerabilitiesData,
+                            borderColor: '#ea580c',
+                            backgroundColor: 'rgba(234,88,12,0.15)',
+                            fill: true,
+                            tension: 0.35
+                        },
+                        {
+                            label: 'Code Smells',
+                            data: codeSmellsData,
+                            borderColor: '#eab308',
+                            backgroundColor: 'rgba(234,179,8,0.15)',
                             fill: true,
                             tension: 0.35
                         },
@@ -1191,7 +1464,58 @@
                 closeModal();
             }
         }
+
+        // Graphical Analysis Modal Functions
+        function openGraphicalAnalysis() {
+            const modal = document.getElementById('graphicalAnalysisModal');
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+
+            // Load metric history data and render chart
+            if (currentProjectKey) {
+                fetchMetricHistory(currentProjectKey);
+            }
+        }
+
+        function closeGraphicalAnalysisModal() {
+            const modal = document.getElementById('graphicalAnalysisModal');
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        // Close graphical analysis modal when clicking outside
+        window.onclick = function(event) {
+            const issuesModal = document.getElementById('issuesModal');
+            const graphModal = document.getElementById('graphicalAnalysisModal');
+            if (event.target === issuesModal) {
+                closeModal();
+            }
+            if (event.target === graphModal) {
+                closeGraphicalAnalysisModal();
+            }
+        }
     </script>
+
+    <!-- Graphical Analysis Modal -->
+    <div id="graphicalAnalysisModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 90vw; max-height: 90vh;">
+            <div class="modal-header">
+                <h2>📊 Graphical Analysis - <span id="graphModalProjectName"></span></h2>
+                <button class="close-btn" onclick="closeGraphicalAnalysisModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div style="margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                    <label style="font-size:0.85rem; color:var(--text-secondary);">From</label>
+                    <input type="date" id="graphHistoryStartDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary);">
+                    <label style="font-size:0.85rem; color:var(--text-secondary);">To</label>
+                    <input type="date" id="graphHistoryEndDate" style="padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-surface); color: var(--text-primary);">
+                    <button class="view-all-btn" style="min-width: 120px;" onclick="applyGraphMetricDateFilter()">Apply Filter</button>
+                </div>
+                <canvas id="graphMetricHistoryChart" height="300"></canvas>
+                <div class="metric-label" id="graphMetricHistoryMessage" style="margin-top: 12px; color: var(--text-secondary);">Metric history shows the latest 30 scan snapshots.</div>
+            </div>
+        </div>
+    </div>
 </body>
 
 </html>
