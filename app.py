@@ -5,7 +5,11 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+<<<<<<< HEAD
 SONAR_URL = "http://sonarqube:9000"
+=======
+SONAR_URL = "http://187.127.142.34:9000"
+>>>>>>> 611808368d8ea42714928e92bc9b12372e56428c
 TOKEN = "squ_a59d4fc58ecbab4929240640afa96a317bfd9a12"
 
 DB = {
@@ -163,10 +167,15 @@ def ensure_db_schema():
 def fetch_projects():
     try:
         r = requests.get(f"{SONAR_URL}/api/projects/search", auth=(TOKEN, ""))
+<<<<<<< HEAD
         r.raise_for_status()
         return r.json().get("components", [])
     except Exception as e:
         print(f"Error fetching projects from {SONAR_URL}: {e}")
+=======
+        return r.json().get("components", [])
+    except:
+>>>>>>> 611808368d8ea42714928e92bc9b12372e56428c
         return []
 
 
@@ -490,8 +499,8 @@ def save_data(project_key, metrics, quality, ratings, issues):
 @app.route("/", methods=["GET"])
 def dashboard():
     projects_raw = fetch_projects()
-    print("PROJECTS:", projects_raw)   # 👈 ADD THIS
-    return jsonify(projects_raw)       # 👈 TEMP CHANGE
+
+
     
     grouped_projects = {}
     for p in projects_raw:
@@ -607,3 +616,7 @@ def api_issues(project_key):
 if __name__ == "__main__":
     ensure_db_schema()
     app.run(debug=True)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 611808368d8ea42714928e92bc9b12372e56428c
