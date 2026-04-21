@@ -603,3 +603,4 @@ def api_issues(project_key):
 if __name__ == "__main__":
     ensure_db_schema()
     app.run(debug=True)
+
