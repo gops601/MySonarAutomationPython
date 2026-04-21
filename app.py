@@ -9,7 +9,7 @@ SONAR_URL = "http://187.127.142.34:9000"
 TOKEN = "squ_a59d4fc58ecbab4929240640afa96a317bfd9a12"
 
 DB = {
-    "host": "localhost",
+    "host": "mysql-db",
     "user": "root",
     "password": "Admin123",
     "database": "sonar_dashboard"
